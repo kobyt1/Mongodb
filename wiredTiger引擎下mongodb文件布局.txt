@@ -1,0 +1,43 @@
+├── admin                                 //系统库admin (角色，用户及认证版本等信息)
+│   ├── collection						  //系统库admin中的集合
+│   │   ├── 14-7503859493301920332.wt	  //use admin  之后show tables  会出现 system.users  system.version
+│   │   └── 9-7503859493301920332.wt
+│   └── index						      //系统库admin中集合的索引
+│       ├── 10-7503859493301920332.wt     //可分别通过这两个命令查看集合的索引信息
+│       ├── 11-7503859493301920332.wt	  //use admin
+│       ├── 15-7503859493301920332.wt     //db.system.users.getIndexes()
+│       └── 16-7503859493301920332.wt     //db.system.version.getIndexes()
+├── diagnostic.data						  //诊断信息，方便排查故障 一般为配合使用							
+│   ├── metrics.2018-09-12T03-35-45Z-00000
+│   └── metrics.interim
+├── journal								  //存储预写日志（Write ahead log）
+│   ├── WiredTigerLog.0000000001
+│   ├── WiredTigerPreplog.0000000001
+│   └── WiredTigerPreplog.0000000002
+├── local								  //系统库local(oplog信息，复制集群信息)
+│   ├── collection						  //use local
+│   │   ├── 0-7503859493301920332.wt	  //show tables
+│   │   ├── 12-7503859493301920332.wt     //可以用上面的命令查看到相关的索引信息
+│   │   ├── 2-7503859493301920332.wt
+│   │   ├── 4-7503859493301920332.wt
+│   │   ├── 5-7503859493301920332.wt
+│   │   └── 7-7503859493301920332.wt
+│   └── index
+│       ├── 13-7503859493301920332.wt
+│       ├── 1-7503859493301920332.wt
+│       ├── 3-7503859493301920332.wt
+│       ├── 6-7503859493301920332.wt
+│       └── 8-7503859493301920332.wt
+├── log									  //存储普通的日志信息目录预先创建
+│   └── mongod.log
+├── _mdb_catalog.wt						  //所有集合的元数据信息（集合对应的文件名，索引信息等）
+├── mongodb7003.cnf						  //配置文件
+├── mongod.lock							  //防止实例重复启动
+├── sizeStorer.wt						  //所有集合的容量信息（文档数，数据总大小）
+├── storage.bson						  //wiredTiger存储引擎的元数据信息
+├── WiredTiger							  //存储引擎版本信息
+├── WiredTigerLAS.wt					  //wiredTiger内存缓存溢出文件
+├── WiredTiger.lock						  //防止多个进程同时连接一个wiredTiger
+├── WiredTiger.turtle					  //存储wiredTiger.wt的元数据信息
+└── WiredTiger.wt						  //存储集合（collection）元数据信息
+

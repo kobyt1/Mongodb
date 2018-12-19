@@ -1,0 +1,171 @@
+mongodb新建数据库
+	use tttt
+	db
+	
+	use语法就是 如果数据库存在 则创建数据库，否则切换到指定数据库
+	
+	创建数据库后用 show  dbs 并不能发现刚才创建的数据库是因为 数据库里面有数据他才会显示出来
+
+删除数据库
+	切换到要删除的数据库
+	use doumaonan
+	db.dropDatabase()
+	show dbs
+
+创建mongodb集合
+	db.createCollection(name,options)
+	name是要创建的集合的名称。options指集合的配置
+	
+	options参数选项列表
+		capped       布尔类型如果为true,则启用封闭的集合。上限集合是固定大小的集合，它在达到其最大大小时自动覆盖其最旧的条目。如果指定true,则还需要指定size参数
+		autoIndexId  布尔类型如果为true，则在  _id 字段上自动创建索引。默认值为false
+		size         数字   指定上限集合的最大大小(以字节为单位)。如果capped为true,那么还需要指定此字段的值
+创建视图
+	db.createView(
+	"test_view",		//视图名字
+	"person",			//视图底层对应的集合
+	[{$project:{"name":"$name"}}]
+	)
+查看数据状态
+	use admin;
+	db.stats()
+显示所有的集合
+	show tables或show collections
+查看集合的状态
+	db.xxxx.stats()
+查看帮助命令
+	help或db.help()或db.函数名不带（） 或 db.xxx.find().help() 
+
+增加数据命令
+	use test
+	db.person.insert(
+	{name:"lidan",
+	age:16
+	}
+	)
+查看数据命令
+	db.person.find(
+	{age:16},
+	{name:1}
+	).skip(0).limit(1)  查询name字段 筛选条件为aget等于16
+
+更新数据命令
+	db.person.update(
+	{age:16},						过滤条件
+	{$set:{name:"andi"}},			$更新方式:更新字段及内容
+	{multi:true})					选项，如修改多条（默认更新1条）
+
+删除数据操作
+	db.person.deleteOne(
+	{age:16}						按过滤条件进行删除
+	)
+	
+	增删改查所对应的逻辑操作符
+		$and     与
+		$or		 或
+		$not	 非
+		$nor     或非
+	
+		$and隐式包含
+		$not not exist
+	比较操作符
+		$lt 		<
+		$lte 		<=
+		$gt			>
+		$gte		>=
+		$ne			!=  <>
+		$in			in
+		$nin		not in
+		
+		使用实例
+			db.person.find({age:{$gt:30}}).count()
+		
+	修改操作符
+		$currentDate			当前时间
+		$inc					累加器
+		$min					比较修改值与原始值，赋值为小的值
+		$max					比较修改值与原始值，赋值为大的值
+		$mul					乘
+		$rename					改名
+		$set 					改指定值
+		$setOnInsert            只插入，重复不修改
+		$unset					移除指定值（字段）
+		使用实例
+			db.person.updateMany(
+			{name:"lidan"},
+			{$inc:{age:1}}
+			)
+增删字段与findAndModify操作
+	添加字段
+	db.person.updateMany(
+	{age:16},
+	{$set:{score:60}},
+	{upsert:true}
+	)
+	删除字段
+	db.person.updateMany(
+	{age:16},
+	{$unset:{score:""}}
+	)
+原子性查询+更新
+	db.person.findAndModify(
+	{
+		query:{name:"andi"},
+		sort:{age:1},
+		update:{$inc:{score:10}},
+		upset:true,
+		new:true
+		}
+	)
+原子性查询+删除
+	db.person.findAndModify(
+	{
+	query:{name:'andi'},
+	sort:{rating:1},
+	remove:true
+	}
+	)
+创建单列，多列索引
+	db.test.createIndex(
+	{
+		x:1   //单个字段索引
+	})
+	db.test.createIndex(
+	{
+		a:1,		//字段a升序
+		b:-1		//字段b降序
+	};{
+	background:true      //放在后台执行 不影响业务
+	})
+	查看集合中的索引
+	db.test.getindexes()
+创建过期索引（TTL:time to live）
+	db.test.createIndex(
+	{"dt":1 //ttl索引字段不能是组合索引
+	}，{
+	expireAfterSeconds:5 //过期时间
+	})
+创建过期索引时间
+	db.runCommand({collMod:"test",index:{keyPattern:{dt:1},
+	expireAfterSeconds:3600
+	}
+	})
+创建hash索引
+	db.test.createIndex(
+	{d:"hashed"
+	})
+创建稀疏索引 
+	db.test.createIndex(
+	{d:1},{sparse:true //稀疏属性
+	})
+删除索引信息
+	db.test.dropIndex(
+	"d_1")
+	
+查看实例状态
+	db.serverStatus()
+查看当前内部操作
+	db.currentOP()
+KILL当前操作
+	db.killOp(12775) 12775是用db.currentOP命令出来的值的opid
+	
