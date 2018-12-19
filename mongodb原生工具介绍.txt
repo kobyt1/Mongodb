@@ -1,14 +1,15 @@
 原生工具集介绍
-mongod			副本集或config节点启动的进程
-mongos			mongos分片集群路由节点进程
-mongo			mongodb客户端工具
-mongostat		统计mongod及实例节点的当前状态信息
-mongodump		将mongo实例数据导出至BSON二进制格式
-mongorestore 	加载由mongodump导出的数据或标准的mongo bson数据流
-bsondump		将bson格式的数据转换为可读的文本或json格式数据的工具
-mongoimport     加载由mongoexport 或第三方工具导出的json,csv或tsv格式数据
-mongoexport		以json或csv导出数据的工具
-mongofiles		命令行下操作gridFS对象的工具
+	
+	mongod			副本集或config节点启动的进程
+	mongos			mongos分片集群路由节点进程
+	mongo			mongodb客户端工具
+	mongostat		统计mongod及实例节点的当前状态信息
+	mongodump		将mongo实例数据导出至BSON二进制格式
+	mongorestore 	加载由mongodump导出的数据或标准的mongo bson数据流
+	bsondump		将bson格式的数据转换为可读的文本或json格式数据的工具
+	mongoimport     加载由mongoexport 或第三方工具导出的json,csv或tsv格式数据
+	mongoexport		以json或csv导出数据的工具
+	mongofiles		命令行下操作gridFS对象的工具
 
 
 存储最大单文档 是16m
