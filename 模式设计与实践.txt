@@ -1,0 +1,43 @@
+mongodb的模式设计与实践
+关系型数据库 vs 文档型数据库
+三范式 	1NF:属性不可再分
+		2NF:属性完全依赖于主键
+		3NF:属性不传递依赖非主属性
+		
+		
+		
+	
+		
+		   
+mongodb文档模式设计的基本策略有哪些？
+		嵌套文档
+		关联模式（慢慢废弃）
+		
+mongodb数据关系模式的种类有哪些
+		一对一
+		一对较多
+		一对很多
+		多对多
+		树形结构 通过父链模型 
+
+db.tree.insert( {_id:'Programming', parent:'books'});
+db.tree.insert( {_id:'Languages', parent:'Programming'});
+db.tree.insert( {_id:'Database', parent:'Programming'});
+db.tree.insert( {_id:'mongo', parent:'Database'});
+db.tree.insert( {_id:'mysql', parent:'Database'});
+
+db.tree.findOne({_id:'mongo'}).parent
+Database
+db.tree.find({parent:'Database'})
+
+
+	有与之对应的子链模型
+db.ctree.insert({_id:'mongodb',children:[]})
+db.ctree.insert({_id:'redis',children:[]})
+db.ctree.insert({_id:'nosql',children:['mongodb',redis]})
+db.ctree.insert({_id:'kexue',children:[]})
+db.ctree.insert({_id:'data',children:['kexue','nosql']})
+db.ctree.insert({_id:'it',children:['data']})
+
+
+null与field存不存在是否等价有什么共通性或具体区别

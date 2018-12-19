@@ -1,0 +1,84 @@
+需要把python更新到3.6的版本
+然后 yum安装
+yum -y install glibc-devel python-devel
+yum -y install python-pip
+yum -y install python-pymongo
+用pip安装模块
+pip install mtools
+pip install pymongo
+pip install psutil
+
+
+
+也可以下载来使用
+wget https://files.pythonhosted.org/packages/f2/07/6cad9445d7bf331f21c969f045b1da76cb2e943a51dd0e2eb83f0a6d9fc9/mtools-1.5.1.tar.gz
+tar xzvf mtools-1.5.1.tar.gz
+将修改后的mtools包上传 之后解压
+cd mtools-develop
+sudo python setup.py install
+
+
+
+ln -s /usr/local/python36/lib/python3.6/site-packages/mtools/mlaunch/mlaunch.py /usr/bin/mlaunc
+chmod 755 /usr/bin/mlaunc
+安装之后把
+ln -s /usr/local/python36/bin/mlogfilter /usr/bin/mlogfilter
+ln -s /usr/local/python36/bin/mloginfo /usr/bin/mloginfo
+ln -s /usr/local/python36/bin/mlogvis /usr/bin/mlogvis
+ln -s /usr/local/python36/bin/mplotqueries /usr/bin/mplotqueries
+ln -s /usr/local/python36/bin/mgenerate /usr/bin/mgenerate
+ln -s /usr/local/python36/bin/mlaunch /usr/bin/mlaunch
+
+
+mlaunch -h  可以查看使用命令
+mlaunch init --single  但是使用这个工具 首先需要在服务器上安装了 mongodb
+
+mkdir /data1
+cd /data1 && mkdir replica
+mlaunch --replicaset --nodes 2 --name rs001 --port 28017
+测试登陆
+
+启动一个两个分片（每个分片一个节点）的微分片
+cd /data1
+mkdir sharding && cd sharding
+mlaunch --replicaset --nodes 1 --port 29017 --sharded 2
+
+--nodes 
+--replicaset 表示启用副本集
+--sharded 2 表示有两个分片
+
+登陆命令
+mongo localhost:20817/admin
+
+
+
+
+rs.status()复制集状态查询命令
+
+db.serverStatus()
+Mongodb有4种锁：r,R,w,W
+
+R:表示全局读锁
+W:全局写锁
+r:某个数据库读锁
+w：某个数据库写锁
+db.serverStatus().globalLock
+
+{
+"totalTime" :NumberLong("172059990000"), //mongod启动后到现在的总时间，单位微秒
+"lockTime" :NumberLong(2031058), //mongod启动后全局锁锁住的总时间，单位微秒
+
+"currentQueue" : {
+"total" : 0, //当前的全局锁等待锁等待的个数
+"readers" : 0, //当前的全局读锁等待个数
+"writers" : 0 //当前全局写锁等待个数
+},
+"activeClients" : {
+"total" : 0, //当前活跃客户端的个数
+"readers" : 0, //当前活跃客户端中进行读操作的个数
+"writers" : 0 //当前活跃客户端中进行写操作的个数
+}
+
+}
+
+
