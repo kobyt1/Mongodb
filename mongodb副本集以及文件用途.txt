@@ -1,0 +1,174 @@
+建立一个mongodb的副本集
+登陆到mongodb中
+然后进行副本集的初始化
+
+cfg={_id:'rs01',version:1,members:[{_id:0,host:"172.16.46.196:7003"}]}
+rs.initiate(cfg)
+输出{"ok":1}证明初始化成功了
+
+建立超级用户
+	use admin
+	db.createUser(
+	... {
+	... user:"zhangtong",
+	... pwd:"zhangtong",
+	... roles:["__system"]
+	... }
+	... )
+	
+用mongo进行标准登陆
+	mongo --host=127.0.0.1 --port=7003 -uzhangtong -pzhangtong --authenticationDatabase=admin --norc
+	
+创建管理员用户
+	use admin
+	db.createUser(
+	... {
+	... user:"test",
+	... pwd:"test",
+	... roles:["root"]
+	... }
+	... )
+	
+删除超级用户
+	use admin
+	db.dropUser('zhangtong')
+
+	
+添加节点
+	rs.add({host:"172.16.46.196:7778",priority:0,votes:0})
+	rs.addArb("172.16.46.197:7778")
+	
+	这里的votes的值代表的是服务器将在副本集选举中投票的投票数。每个成员的投票数是1或0，而仲裁人总是有1票 并且优先权大于0的成员不能有0票
+删除节点
+	rs.remove("172.16.46.196:7778")
+
+查看复制信息
+	rs.printSlaveReplicationInfo()  //检查副本集成员的延迟情况
+	rs.printReplicationInfo()       //显示oplog大小及可写入时间范围
+	
+查看副本集的状态
+	rs.status()
+		
+		self：这个字段只会出现在运行rs.status函数的成员信息中。
+		stateStr: 服务器状态PRIMARY，SECONDARY，ARBITER。
+		uptime: 从成员可达一直到现在所经历的时间，单位是秒。
+		optimeDate: 每个成员的oplog中最后一个操作发生的时间。注意:这里的状态是每个成员通过心跳报告上来的状态,所以optime跟实际时间可能会有 几秒钟的偏差。
+		lastHeartbeat:当前服务器最后一次收到其他成员心跳的时间,如果网络故障,或者是当前服务器比较繁忙,这个时间可能会是2秒钟之前。
+		pingMs:心跳从当前服务器到达某个成员所花费的平均时间。
+		errmsg:成员在心跳请求中返回的状态信息,通常是一些状态信息,而不是错误信息。
+		state:也表示服务器的状态,state是内部表示,而stateStr是适合阅读的表示。
+		optime:和optimeDate也是一样的,只是optimeDate更适合阅读。
+		syncingTo:表示当前成员正在从哪个成员处进行复制。
+
+查看副本集配置信息
+	rs.config() rs.conf()
+修改副本集配置信息
+	cfg=rs.conf();rs.reconfig(cfg)
+允许在从库执行查询及手动主从切换
+	rs.slaveOk() 
+	rs.stepDown()
+
+查看mongodb副本集支持的所有操作
+	rs.help()
+		rs.status()                                { replSetGetStatus : 1 } checks repl set status 								 	查看副本集状态
+		rs.initiate()                              { replSetInitiate : null } initiates set with default settings					副本集进行初始化
+		rs.initiate(cfg)                           { replSetInitiate : cfg } initiates set with configuration cfg					
+		rs.conf()                                  get the current configuration object from local.system.replset					local.system.replset 中获取配置信息
+		rs.reconfig(cfg)                           updates the configuration of a running replica set with cfg (disconnects)		更新副本集配置
+		rs.add(hostportstr)                        add a new member to the set with default attributes (disconnects)				添加一个成员
+		rs.add(membercfgobj)                       add a new member to the set with extra attributes (disconnects)					
+		rs.addArb(hostportstr)                     add a new member which is arbiterOnly:true (disconnects)							添加一个选举者 arbiterOnly:true
+		rs.stepDown([stepdownSecs, catchUpSecs])   step down as primary (disconnects)												 	主服务器变为备份服务器
+		rs.syncFrom(hostportstr)                   make a secondary sync from the given member										备份服务器指定hostportstr中同步数据
+		rs.freeze(secs)                            make a node ineligible to become primary for the time specified					使不能成为主节点的节点可以成为主节点
+		rs.remove(hostportstr)                     remove a host from the replica set (disconnects)									从副本集删除一个节点
+		rs.slaveOk()                               allow queries on secondary nodes													 允许副节点查询数据
+		rs.printReplicationInfo()                  check oplog size and time range													 查看oplog 的大小时间
+		rs.printSlaveReplicationInfo()             check replica set members and replication lag									 查看副本集成员同步情况
+		db.isMaster()                              check who is primary																 查看是否为主节点
+
+	
+副本集内存使用信息
+	rs001:PRIMARY> db.serverStatus().mem
+{
+	"bits" : 64,            //操作系统位数
+	"resident" : 42,		//物理内存消耗，单位M
+	"virtual" : 1533,		//虚拟内存消耗
+	"supported" : true,     //为true表示支持显示额外的内存信息
+	"mapped" : 0,           //映射内存
+	"mappedWithJournal" : 0 //除了映射内存外还包括journal日志消耗的映射内存
+}
+
+
+
+
+db.serverStatus().indexCounters
+{
+"accesses" : 35369670951, //索引访问次数，值越大表示你的索引总体而言建得越好，如果值增长很慢，表示系统建的索引有问题
+"hits" : 35369213426, //索引命中次数，值越大表示mogond越好地利用了索引
+"misses" : 0, //表示mongod试图使用索引时发现其不在内存的次数，越小越好
+"resets" : 0, //计数器重置的次数
+"missRatio" : 0 //丢失率，即misses除以hits的值
+}
+
+db.serverStatus().network
+{
+	"bytesIn" : NumberLong(1400094),
+	"bytesOut" : NumberLong(2112565),
+	"physicalBytesIn" : NumberLong(1400094),
+	"physicalBytesOut" : NumberLong(2112565),
+	"numRequests" : NumberLong(10242)
+}
+
+
+
+db.serverStatus().repl
+{
+	"hosts" : [
+		"localhost:28017",
+		"localhost:28018"
+	],
+	"setName" : "rs001",//副本集名称
+	"setVersion" : 1,   //副本集版本
+	"ismaster" : true,  
+	"secondary" : false,
+	"primary" : "localhost:28017",
+	"me" : "localhost:28017",
+	"electionId" : ObjectId("7fffffff0000000000000001"),
+	"lastWrite" : {
+		"opTime" : {
+			"ts" : Timestamp(1536045491, 1),
+			"t" : NumberLong(1)
+		},
+		"lastWriteDate" : ISODate("2018-09-04T07:18:11Z")
+	},
+	"rbid" : 906770733
+}
+
+副本集的操作计数器
+	db.serverStatus().opcountersRepl
+	{
+	"insert" : 599, // mongod replication最近一次启动后的insert次数
+	"query" : 0,
+	"update" : 0,
+	"delete" : 0,
+	"getmore" : 0,
+	"command" : 0
+	}
+
+操作计数器
+	db.serverStatus().opcounters
+	{
+		"insert" : 0,
+		"query" : 7,
+		"update" : 0,
+		"delete" : 0,
+		"getmore" : 1426, //mongod最近一次启动后的getmore次数,这个值可能会很高，因为子节点会发送getmore命令，作为数据复制操作的一部分
+		"command" : 4130  //mongod最近一次启动后的执行command命令的次数
+	}
+
+	
+	
+  1，在非mongos路由节点执行db.serverCmdLineOpts().parsed.replication.replSet 这个命令如果报错或为空那么说明是单节点否则是普通副本集或分片节点
+  2，上述1的基础上正常后如果执行db.serverCmdLineOpts().parsed.sharding.clusterRole 输出为shardsvr表示为分片节点如果输出configsvr则为config节点
+  

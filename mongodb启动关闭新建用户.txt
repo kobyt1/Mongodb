@@ -1,0 +1,109 @@
+MongoDB启动关闭参数
+	
+	启动 
+		mongod --fork --dbpath=/data1/mongodb7777/db/ --logpath=/data1/mongodb7777/log/mongod.log	--logappend --port 29017 &
+		
+		基于配置文件命令启动
+		vi /data1/mongodb7777/conf/mongod.conf
+		mongod -f /data1/mongodb7777/mongod.conf 
+		
+		以修复模式启动 mongodb：
+			mongod --repair -f mongodb.conf
+	
+	关闭
+		mongod --shutdown --dbpath=/data1/mongodb7777/db/ 
+		
+		mongo localhost:29019/admin
+			>use admin
+			>db.shutdownServer()
+		
+		mongod --shutdown -f /data1/mongodb7777/conf/mongod.conf
+		
+
+MongoDB登陆数据库
+	mongo --host=127.0.0.1 --port=7003 --authenticationDatabase=admin -u mongo -p XXX
+		
+_mdb_catalog.wt里存储了所有集合的元数据，包括集合对应的WT table名字，集合的创建选项，集合的索引信息等，WT存储引擎初始化时，会从_mdb_catalog.wt里读取所有的集合信息，并加载元信息到内存
+	
+创建用户
+	在mongodb中特别注意的一点是 账号是跟着库走的，所以在指定库里授权，必须在指定库里验证（auth）
+		use admin
+		db.createUser({user:"zhangtong",pwd:"zhangtong",roles:[{"role":"userAdminAnyDatabase","db":"admin"}]})
+	创建超级以及管理用户
+		db.createUser({user:"zhangtong",pwd:"zhangtong",roles:["__system"]})
+		db.createUser({user:"test",pwd:"test",roles:["root"]})
+	以内置角色创建业务用户
+		db.createUser({user:"mongo",pwd:"mongo",roles:[{role:"readWrite",db:"test"}]})
+		
+		
+		
+		user:用户名
+		pwd:密码
+		roles:指定用户的角色，可以用一个空数组合给新用户设定空角色;在roles字段，可以指定内置角色和用户定义的角色。
+		
+		Built-In Roles（内置角色）：
+			1. 数据库用户角色：read、readWrite;
+			2. 数据库管理角色：dbAdmin、dbOwner、userAdmin；
+			3. 集群管理角色：clusterAdmin、clusterManager、clusterMonitor、hostManager；
+			4. 备份恢复角色：backup、restore；
+			5. 所有数据库角色：readAnyDatabase、readWriteAnyDatabase、userAdminAnyDatabase、dbAdminAnyDatabase
+			6. 超级用户角色：root  
+			7. 内部角色：__system
+			这里还有几个角色间接或直接提供了系统超级用户的访问（dbOwner 、userAdmin、userAdminAnyDatabase）
+
+		具体角色：	
+		Read：允许用户读取指定数据库
+		readWrite：允许用户读写指定数据库
+		dbAdmin：允许用户在指定数据库中执行管理函数，如索引创建、删除，查看统计或访问system.profile
+		userAdmin：允许用户向system.users集合写入，可以找指定数据库里创建、删除和管理用户
+		clusterAdmin：只在admin数据库中可用，赋予用户所有分片和复制集相关函数的管理权限。
+		readAnyDatabase：只在admin数据库中可用，赋予用户所有数据库的读权限
+		readWriteAnyDatabase：只在admin数据库中可用，赋予用户所有数据库的读写权限
+		userAdminAnyDatabase：只在admin数据库中可用，赋予用户所有数据库的userAdmin权限
+		dbAdminAnyDatabase：只在admin数据库中可用，赋予用户所有数据库的dbAdmin权限。
+		root：只在admin数据库中可用。超级账号，超级权限
+
+登陆之后进行认证
+	db.auth("zhangtong","zhangtong")
+	1
+如果不进行认证 执行执行命令会报错 例如 直接执行show dbs  会报错没有权限
+根据上面说的 在指定库下授权必须要在指定库里认证
+	
+	
+	查看当前库下的用户可以执行 
+		use  test
+		show users
+	查看所有帐号
+		use admin
+		db.auth('zhangtong','zhangtong')
+		db.system.users.find().pretty()  
+	查看所有账号数量
+		db.system.users.find().count()
+	
+	更改用户密码
+		db.changeUserPassword('test','newpasswd')
+
+	查看用户的角色
+		use test
+		db.getUser("test")
+	查看角色包含的权限
+		use doumaonan
+		db.getRole('readWrite',{showPrivileges:true})
+		db.getRoles()
+	收回权限
+		use doumaonan
+		db.revokeRolesFromUser("doumaonan",[{ role: "readWrite", db:'doumaonan' }])
+	授予权限
+		use doumaonan
+		db.grantRolesToUser("doumaonan",[{ role:"readWrite", db:"doumaonan" }])
+示例：
+	use admin
+	db.createUser({user:'root',pwd:'113513', roles:[{role:'root', db:'admin'}]})     ---创建超级管理员用户
+ 
+	db.createUser({user:'admin',pwd:'admin', roles:[{role:'userAdminAnyDatabase', db:'admin'}]})     ---创建用户管理员账户（能查询其他库集合，但不能查询集合内容）
+ 
+	db.createUser({user:'mongo',pwd:'mongo', roles:[{role:'readWriteAnyDatabase', db:'admin'}]})     ---创建访问任意库读写的账户
+ 
+	db.createUser({user:'test',pwd:'test',roles:[{role:'readWrite',db:'test'}]})     ---创建只对test库有读写权限的用户
+ 
+	db.createUser({user:"backup",pwd:"backup",roles:[{role:"backup",db:"admin"}]})     ---创建用于备份时的用户，如若是恢复权限，则将backup换为restore即可

@@ -1,0 +1,142 @@
+数据类型介绍
+数据类型			类型编号		数据类型别名		备注
+double				1				'double'			8字节
+string				2				'string'			utf8编码默认字节比较
+array				4				'array'				依据具体数据(数组可以在每一列存储不同的类型)
+objectld			7				'objectld'			12字节 (默认的_id)
+date				9				'date'				8字节  
+32-bit integer		16				'int'				4字节
+timestamp			17				'tiemstamp'			8字节
+64-bit integer		18				'long'				8字节 很少用32位整形 一般用64位整形
+decimal128			19				'decimal'			version>=3.4
+min key 			-1				'minkey'			分片集群chunk集合中出现
+max key				127				'maxkey'			分片集群chunk集合中出现
+boolean				8				'bool'				实际使用少
+null				10 				'null'				实际使用少
+object				3				'object'			广泛的类型
+binary data			5				'binData'                      
+
+Mongodb Objectld
+再插入一个文档时如果没有显示指定_id那么mongodb会为每个文档生成一个Objectld类型的_id来作为主键  构成如下
+		4-byte 存储时间戳（精确到秒）Timestamp
+		3-byte 存储机器码			 Machine    指的是所在主机的唯一标识,一般是机器主机名的散列值，确保了不同主机生成不同的机器hash值，确保在分布式中不造成冲突，这也就是在同一台机器生成的objectld中间的字符串都是一模一样的原因
+		2-byte 存储进程id            pid		上面的Machine是为了确保在不同机器产生的objectid不冲突，而pid就是为了在同一台机器不同的mongodb进程产生了objectid不冲突
+		3-byte 计数器				 ncl        是一个自动增加的计数器，用来确保在同一秒内产生的objectid也不会发现冲突，允许256的3次方等于16777216条记录的唯一性。
+	
+	设计成轻量型的，不同的机器都能用全局唯一的同种方法方便地生成它。这是MongoDB 采用ObjectId，而不是其他比较常规的做法（比如自动增加的主键）的主要原因，因为在多个服务器上同步自动增加主键值既费力还费时。MongoDB 从一开始就设计用来作为分布式数据库，处理多个节点是一个核心要求。ObjectId 类型在分片环境中要容易生成得多。	
+	MongoDB可以通过自身的服务来产生objectId，也可以通过客户端的驱动程序来生成objectId。虽然objectId是轻量级的，但如果全部在服务端生成肯定会花费一点开销。所以，能从服务器端转移到客户端驱动程序完成的，就尽量转移到客户端来完成，减少服务器端的开销。
+	
+	
+	
+	自增性问题：_id不绝对自增前4个字节是时间戳故只能精确到秒同一秒进程id大小决定顺序
+	唯一性问题：同一个机器同一时间下因为计数器的存在在2^24-1个值内都是唯一性
+	_id存在意义：	1.解决分布式场景下唯一性标志问题
+					2.复制依赖_id方便定位修改的记录
+	
+	
+	Objectld用例：
+				shell下获取_id的时间戳方式  _id.getTimestamp()
+				
+
+				关于Mongondb Date类型
+Mongodb底层以BSON存储而按照BSON Date/Time数据类型定义日期时间被称为UTC时间
+故业务计算时需注意与本地时间进行转换
+		1.获取当前本地时间 Date()
+		2.获取当前UTC时间  new Date()
+		
+关于Mongondb Timestamp
+作为BSON特殊的时间戳类型Timestamp主要用于Mongondb内部使用其主要构成如下：
+		1.前32位存储时间戳
+		2.后32位存储同一秒内自增值
+	Timestamp通常应用与复制中的oplog,业务层面通常建议使用Date类型
+		1.db.test.insert({ts:new Timestamp()})
+		2.如果ts为嵌入式文档则默认时间戳为0
+		
+Mongodb的null
+如字段a不存在{}与{a:null}相对等价a
+	db.leix.insert({_id:1,item:null});
+	db.leix.insert({_id:2});
+	db.leix.createIndex({item:1},{background:true})
+
+	存在性查询
+	db.leix.find({item:{$exists:false}})
+	{ "_id" : 2 }
+	
+	null值查询
+	db.leix.find({item:null})
+	{ "_id" : 1, "item" : null }
+	{ "_id" : 2 }
+
+	关于索引
+	都会走索引
+	
+	
+$type查询某个字段具体类型的数据
+	首先清空test表
+	db.test.removed()
+	db.test.insert({a:1,mk:MinKey(),udt:new Date()})
+	进行查询
+	db.test.find({'a':{$type:'double'}})
+	db.test.find({'mk':{$type:'minKey'}})
+	db.test.find({'udt':{$type:'date'}})
+	
+mongo shell下查看数据类型方法
+	1.  typeof 1
+		number
+		typeof 'ceshi'
+		string
+	2.NumberInt(1) instanceof NumberLong
+		false
+	3.[] instanceof Array
+		true
+	4.NumberDecimal(99999999,488899999) instance Number
+		declimal构造时候一定要带引号
+		
+		
+数据类型从小到大比较顺序如下
+	1.MinKey
+	2.Null
+	3.Numbers(ints,longs,doubles,decimals)
+	4.String
+	5.Object
+	6.Array
+	7.BinData
+	8.Objectld
+	9.Boolean
+	10.Date
+	11.Timestamp
+	12.Regular Expression
+	12.MaxKey
+	
+	验证用例：
+	db.test.insert([{a:1},{a:MinKey()},{a:new Date()},{a:Timestamp()},{a:[1]},{a:null},{a:NumberLong(1)}])
+	db.test.find({},{_id:0}).sort({a:1})
+	
+	
+mongo因其包含了非常规数据类型故对容量的评估不能按照关系型数据库评估方式
+	1.与RD评估业务最大写入tps并预估一天的写入量
+	2.根据真实业务与RD讨论 并确认索引的具体字段与数量情况
+	3.根据具体业务在不同压缩模式下模拟真实数据写入并计算数据及索引大小之和
+	4.按等比率方式评估数据1~2年内的大致容量并在此基础上额外增加30%左右余量
+	5.按照之前评估的tps,容量及业务可发展趋势在具体机器资源分配上再进行评估
+	
+	
+show dbs
+test      0.000GB						(storageSize+indexSize)=du -sh test
+db.stats()
+{
+	"db" : "test",
+	"collections" : 4,    							//集合数量
+	"views" : 0,									//视图
+	"objects" : 12,									//所有集合的文档数dataSize/avgObjSize
+	"avgObjSize" : 69.66666666666667,				//dataSize/objects(bytes)
+	"dataSize" : 836,								//未压缩的数据大小不含索引（bytes）
+	"storageSize" : 122880,							//存储引擎分配存储数据大小（bytes）
+	"numExtents" : 0,								//扩展
+	"indexes" : 5,									//索引数量
+	"indexSize" : 159744,							//所有集合索引（压缩）大小存储（tybes）
+	"ok" : 1
+}
+
+	
+

@@ -1,0 +1,176 @@
+能解决当前关系型数据库遇到的瓶颈问题
+	1.高可用
+	2.读写性能瓶颈
+	3.海量数据存储
+	4.需求变更频繁 ddl语句
+	5.弹性扩容问题
+	
+约定术语
+
+replicateSet	 :中文名称'副本集'指可自动高可用的简单集群
+mongos      	 :独立出现时专指mongos集群或分片集群也可称分布式集群
+mongos  节点	 :专指mongos或分片集群中的路由节点
+shard       	 :中文名称"分片" 在mongos集群中才有的说法本质是一个副本集
+chunk			 :指代mongos或分片集群中的逻辑存储单元
+balance     	 :中文名称 "均衡器"，主要负责mongos集群shard间数据均衡
+orphaned document:中文名"孤立文档" 指shard间数据迁移后 源端尚未删除的文档
+
+版本选择 3.4或者3.6
+
+
+mongodb的主要特性
+	
+	高性能
+	丰富的索引                                  索引类型 :单列，多列索引，多key索引，哈希索引，地理索引，文本索引
+												索引属性 :唯一索引，过期索引，部分索引，稀疏索引
+	文档化
+	高可用										一主多从
+	强压缩										WiredTiger引擎的三种压缩方式 uncompressed，Snappy(默认压缩方式)，Zlib(压缩比最大的方式)
+	分布式										shard集群 可以扩展集群N
+	一致性										MongoDB提供Write Concern及Read Concern方便自主选择读写一致性强度
+	多文档事物（4.0版本支持）					提供多文档事物支持为强一致性业务数据需求提供更可靠的保障
+	
+MongoDB的劣势
+	不支持分布式事物在shard集合写数据一致性上需加强（后续版本）
+	对内存使用几乎无限制可能导致实例发生OOM的情况
+	mongos分片集群备份与恢复尚没有相对可靠的工具
+	统计分析类聚合矿浆（aggregation）使用相对复杂易出错
+	
+	
+	
+	
+mongodb和mysql的概念对比
+
+			MySQL										MongoDB
+		database(数据库)							database
+		table(表)									collection
+		row(行)										JSON or BSON
+		column(列)									Field
+		index(索引)									index
+		table join(表连接)							$lookup或嵌套文档（建议嵌套文档）
+		primary key(主键)							_id
+		统计分析									aggregation
+		Redo日志									journal日志
+		binlog日志									Oplog日志
+		
+mongodb和mysql的语句对比
+		
+			sql模式语句									mongodb模式语句
+		create table 								db.test.insert({x:1}) 或db.createCollection("test")
+		alter table add/drop column					db.test.update({},{'$set':{a:2}})或者删除字段用$unset
+		create index 或 alter table add index   	db.test.createIndex({x:1,a:-1})
+		drop table或truncate table 					db.test.drop()
+		drop database 								db.dropDatabase()
+		insert into									db.test.insertOne()或db.test.insert()
+		select col from test order by a limit 1,2	db.test.find({xxx:10},{x:1,a:1}).sort({a:1}).skip(1).limit(2)
+		update										db.test.update({x:1},{$set:{a:6}})
+		delete from 								db.test.deleteMany({x:1})
+架构
+	
+	单节点 主从架构 现已很少使用
+	副本集 一主多从 有隐藏节点和延迟节点 并未理解其中含义 仲裁节点
+	分片集群架构
+
+
+集群部署系统配置
+	大多数操作为随机io操作，因此采用ssd或pcie是最佳方案，如普通磁盘建议使用RAID10
+	额外知识点：阵列级别，读写策略，BBU
+	
+	io调度算法建议
+	普通磁盘：deadline避免io请求出现 “饥饿”现象
+	ssd/pcie：noop简单的FIFO（新进先出）处理请求
+	echo 'noop'>/sys/block/vdc/queue/scheduler 并添加至/etc/rc.local
+	
+	预读（readahead）设置
+	具体调整多少需考虑具体的业务场景 顺序io可调大随机io需适当调小
+	查看预读值：sudo blockdev --report
+	更改预读值：sudo blockdev --setra 64 ##64表示64个512-byte的扇区
+	
+	文件系统选择
+	WiredTiger引擎建议使用XFS,Ext4内部journal与WiredTige存在兼容性问题 高io下 效率低下
+	
+	磁盘卷挂载优化
+	在存储数据库文件的磁盘卷设备default后增减noatime,nodiratime
+	vim /etc/fstab
+	/dev/vdc  /data1 xfs  defaults,noatime,nodiratime  1 2
+	
+	内核版本建议
+	linux下面建议内核版本大于等于2.6.36
+	XFS文件系统下建议linux内核不低于2.6.25
+	Red Hat或Centos linux下内核不低于 2.6.18-194
+	
+	内存配置优化
+	关闭大叶内存（Transparent Huge Pages）
+		echo "never" > /sys/kernel/mm/transparent_hugepage/enabled
+		echo "never" > /sys/kernel/mm/transparent_hugepage/defrag
+		并将命令添加至 /etc/rc.local中
+		
+	使用NTP时间服务
+	MongoDB副本集及分片集群对时间有依赖性，尽量保证时间差小于1秒
+	
+	内存文件描述符合进程/线程数限制
+	命令行下修改
+		ulimit -n 65000 & ulimit -u 65000 & ulimit -s 1024
+	配置文件修改
+	vim /etc/security/limits.conf
+		* soft nproc 65535
+		* hard nproc 65535
+		* soft nofile 65536
+		* hard nofile 65536
+		* soft stack 10240
+		* hard stack 10240
+	
+	vim /etc/security/limits.d/90-nproc.conf
+		* soft    nproc     10240
+	
+MongoDB配置文件格式有两种TOML和YAML默认使用TOML即key=value模式
+MongoDB性能相关参数配置建议
+	MongoDB性能瓶颈大多数与io相关，建议为journal日志和data单独设定物理卷
+	journal日志不支持直接指定至其他目录，可以通过创建symbol link的方式解决
+	配置wiredTigerCacheSizeGB=* 			指定引擎内存cache大小尽量覆盖所有热数据，减少checkpoint代价
+	配置storage.directoryPerDB=true     	将数据文件独立存储
+	配置wiredTigerDirectoryForIndexes=true  将索引文件独立存储
+	配置wiredTigerCollectionBlockCompressor=snappy  指定集合压缩存储模式[zlib,none]
+	配置journal = true 开启journal日志在实例崩溃情况下尽量保持最新数据一致性
+	
+MongoDB安全相关参数配置建议
+	配置nohttpinterface = true (版本<3.6) 关闭web接口避免数据库访问安全性问题
+	配置bind_ip_all = true (版本>=3.6) 配置实例节点开放的访问范围
+	配置keyFile=/dbPath/keyFile 指定集群间认证模式
+			openssl rand -base64 66 -out keyFile
+			chmod 600 keyFile && chown mongo.mongo keyFile
+	配置setParameter=enabledLocalhostAuthBypass=1 启用localhost execption(本地认证)
+	配置maxConns=65536 控制最大连接数避免连接数过大耗尽机器资源
+	
+	
+	fork = true 													#后台端口
+	port = 7777														#监听端口
+	quiet = true													#官方建议关闭以方便排查问题，这里建议打开
+	dbpath = /data1/mongodb7777										#数据目录路径
+	logpath = /data1/mongodb7777/log/mongod.log						#指定日志路径
+	logappend = true                                                #日志是以追加的方式记录
+	journal = true 													#线上业务建议都开启journal
+	nohttpinterface = true 											#关闭web接口 3.6已经废弃
+	directoryperdb = true											#指定一个db对应一个目录
+	wiredTigerDirectoryForIndexes=true								#为索引文件指定独立的目录
+	bind_ip_all = true 												#>=3.6相当于白名单
+	maxConns = 65536												#配置最大连接数
+	profile = 1														#配置日志记录级别
+	slowms = 500													#配置慢查询记录时间（毫秒）
+	replSet = 7777													#指定副本集
+	oplogSize = 40960												#指定oplog大小
+	#shardsvr = true												#配置节点角色（>=3.4 shard节点专用）
+	#configsvr = true												#指定config节点角色（>=3.4 config节点专用）
+	#configdb = MSCHOST												#指定config配置信息（mongos节点专用）
+	keyFile = /data1/mongodb7777/keyFile 							#指定keyFile认证文件
+	setParameter=enabledLocalhostAuthBypass=1						#开启本地认证
+	storageEngine = wiredTiger										#指定存储引擎
+	wiredTigerCacheSizeGB=1											#指定存储引擎内部cache
+	wiredTigerCollectionBlockCompressor=snappy						#指定引擎集合压缩模式
+	
+	
+		
+		
+		
+
+	

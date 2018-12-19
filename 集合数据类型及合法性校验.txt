@@ -1,0 +1,145 @@
+集合数据类型及合法性校验
+灵活模式的烦恼
+db.person.insert({"book_id":NumberLong(11),'name':'mongo','price':NumberDecimal('70.8')});
+db.person.insert({"book_id":NumberInt(10),'name':'redis'});
+db.person.insert({'book_id':'12','name':'mysql','price':60.9,unit:'￥'});
+db.person.insert({'book_id':13,'name':'oracle','price':80.5,'unit':'#'});
+
+mongodb3.2开始MongoDB在创建集合的时候提供了validator选项来规范插入和更新数据的规则
+为了3.2版本的vaildator功能MongoDB3.6提供了JSON Schema进一步完善校验规则
+对于数据库中已经存在的集合可使用collModl来修改集合从而添加对应的validator校验规则
+对于类似于vaildator与版本相关的特性在数据库升降级过程中需要预先进行处理
+数据校验功能对插入更新的性能影响非常小线上环境亦可放心使用  性能影响5%左右吧
+
+
+Validator相关概念
+	validator+查询逻辑操作符（除$near,$nearSphere,$text,$where）:定义具体的校验规则
+
+	validationLevel:定义了插入更新记录时应用校验规则的严格程度
+					strict	:默认严格级别 校验规则会应用到所有的插入与更新上
+					
+					moderate:仅对insert和满足校验规则的文档做update有效
+							 对已存在的不符合校验规则的文档无效
+					
+					off		:关闭校验
+	
+	validationAction:定义了当数据不满足校验规则的时候的具体动作
+					error	:默认直接打印报错并拒绝文档
+					
+					warn	:日志打印告警提示但接受文档
+					
+validation使用限制
+	不允许在local,admin及config等系统库中的集合创建具有校验规则的集合
+	不允许对system.*等系统集合创建校验规则
+	原因是避免系统内部操作无法正常写入系统集合而导致不可预料的问题
+
+创建一个带有validator的表	
+	db.createCollection('validate_test', 
+	{validator:{$and: [ {phone:{$type:'long'}}, 
+						{email:{$regex:/@mongodb\.com$/}}, 
+						{status:{$in:['good','bad']}}
+						]
+				}, 
+	validationLevel:'moderate',
+	validationAction:'error' 
+	}
+						)
+	
+	插入数据进行试验
+	db.validate_test.insert({phone:'1234556788',email:'awggs@mongodb.com',status:'running'})
+	报错
+	db.validate_test.insert({phone:NumberLong(1231323),email:'erew@mongodb.com',status:'good'})
+	正确
+	
+	
+
+		
+
+db.createCollection('test',
+ {validator:{$jsonSchema:{
+	bsonType:'object',
+	required:['name','age','sex'],
+	properties:{
+		name:{
+			bsonType:'string',
+			description:'must be a string and is required'},
+		age:{
+			bsonType:'int',
+			minimum:0,
+			maximum:125,
+			exclusiveMaximum:false},
+		sex:{
+			enum:['man','woman']}
+			   
+			   }
+						}
+		}
+ }
+)
+
+db.createCollection('lala',
+	{validator:{
+	$jsonSchema:{
+		bsonType:'object',
+		required:['name','phone','age','address'],
+		properties:{
+			name:{
+				bsonType:'string',
+				description:'must be string',
+				pattern:20},
+			phone:{
+				bsonType:'long',
+				description:'phone no'},
+			age:{
+				bsonType:'int',
+				description:'age',
+				minimum:0,
+				maximum:100,
+				exclusiveMaximum:false},
+			address:{
+				bsonType:'string',
+				minLength:4,
+				maxLength:20}
+				}
+			}
+		}
+	}
+)
+
+Validator属性修改
+	关闭校验
+		db.runCommand({
+		collMod:'validate_test',
+		validationLevel:'off'
+		})
+	此时再插入数据就不会报严格错误了
+	
+	
+	将校验级别改为严格模式
+		db.runCommand({
+		collMod:'validate_test',
+		validationLevel:'strict'
+		});
+		
+db.getCollectionInfos()获去表的详细字段		
+		
+新接手一个mongodb项目如何快速了解集合结构
+对于已经存在可能有问题的文档数据应该如何处理？
+	Variety 一个开源的js脚本集，提供了丰富的数据校验功能
+	功能特点：
+		输出结果简单清晰
+		可指定过滤条件及限制文档数量
+		可正反序对集合进行分析
+		可对部分字段进行排除
+		可指定对嵌套文档的分析深度
+		可指定输出格式及持久化分析结果
+		
+	Variety用例：
+	1.对集合users进行分析
+	mongo 127.0.0.1:7003/test --eval "var collection='person'" variety.js
+	2.按指定条件进行分析
+	mongo 127.0.0.1:7003/test --eval "var collection='person',query={'age':16}" variety.js
+	3.分析文档最大深度及指定输出格式
+	首先插入数据db.person.insert({name:'Walter',someNestedObject:{a:{b:{c:{d:{e:1}}}}}});
+	mongo 127.0.0.1:7003/test --eval "var collection='person',maxDepth = 3,outputFormat='ascii'" variety.js
+	
